@@ -1,4 +1,4 @@
-"""36_safe_print.py"""
+"""safeprint.py"""
 import asyncio
 import queue
 import threading
