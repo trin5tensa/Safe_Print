@@ -3,22 +3,93 @@ import asyncio
 import queue
 import threading
 import time
-from typing import Callable, Optional
+from contextlib import AbstractContextManager
+from types import TracebackType
+from typing import Type
 
 
-# Used by get_timestamp to measure elapsed time.
+# Used by _timestamp to measure elapsed time.
 _TIME_0 = time.perf_counter()
-PRINT_Q = queue.Queue()
+_PRINT_Q = queue.Queue()
 
-_print_thread: Optional[threading.Thread] = None
+_print_thread: threading.Thread | None = None
 
 
-def get_timestamp() -> str:
+def start():
+    """ Start the print queue.
+    
+    Returns:
+        print queue
+        timestamp
+    """
+    global _print_thread
+    _print_thread = threading.Thread(target=_safe_print_consumer, name='Print Thread')
+    _print_thread.start()
+
+
+def safeprint(msg: str, timestamp: bool = True, reset: bool = False):
+    """Print a string on stdout from an exclusive Print Thread.
+    
+    The exclusive thread and a threadsafe print queue ensure race free printing.
+    This is the producer in the print queue's producer/consumer pattern.
+    It runs in the same thread as the calling function
+    
+    Args:
+        msg: The message to be printed.
+        timestamp: Print a timestamp (Default = True).
+        reset: Reset the time to zero (Default = False).
+    """
+    if reset:
+        global _TIME_0
+        _TIME_0 = time.perf_counter()
+    if timestamp:
+        _PRINT_Q.put(f'{_timestamp()} --- {msg}')
+    else:
+        _PRINT_Q.put(msg)
+
+
+def close():
+    """ Close the print queue. Join the thread in which it runs.
+    """
+    _PRINT_Q.put(None)
+    _print_thread.join()
+
+
+class SafePrint(AbstractContextManager):
+    def __enter__(self):
+        start()
+        return safeprint
+        
+    def __exit__(self, __exc_type: Type[BaseException] | None, __exc_value: BaseException | None,
+                 __traceback: TracebackType | None) -> bool | None:
+        close()
+        return False
+
+
+def _safe_print_consumer():
+    """Consume and print tasks from the print queue.
+
+    The print statement is not threadsafe, so it must run in its own thread.
+    This is the consumer in the print queue's producer/consumer pattern.
+    """
+    print(f'{_timestamp()}: The Safeprinter is open for output.')
+    while True:
+        msg = _PRINT_Q.get()
+        
+        # Exit function when any producer function places 'None' into the queue.
+        if msg:
+            print(msg)
+        else:
+            break
+    print(f'{_timestamp()}: The Safeprinter has closed.')
+
+
+def _timestamp() -> str:
     """Create a timestamp with useful status information.
-    
-    This is a support function for the print queue producers. It runs in the same thread as the producer.
+
+    This is a support function for the print queue producers. It runs in the same thread as the calling function.
     Consequently, the returned data does not cross between threads.
-    
+
     Returns:
         timestamp
     """
@@ -32,51 +103,7 @@ def get_timestamp() -> str:
             raise
     else:
         loop_name = 'the asyncio loop'
-    return f'{secs:.3f}s  In {threading.current_thread().name} of {threading.active_count()} with {loop_name}  --- '
-
-
-def start():
-    """ Start the print queue.
-    
-    Returns:
-        print queue
-        timestamp
-    """
-    global _print_thread
-    _print_thread = threading.Thread(target=_print_queue_consumer, name='Print Thread')
-    _print_thread.start()
-
-
-def close(msg: str = None):
-    """ Close the print queue.
-    
-    Add final messages to the print queue. Join the thread in which it runs.
-    
-    Args:
-        msg: Closedown message
-    """
-    if msg:
-        PRINT_Q.put(f'{get_timestamp()} {msg}')
-    PRINT_Q.put(None)
-    _print_thread.join()
-
-
-def _print_queue_consumer():
-    """Consume and print tasks from the print queue.
-
-    The print statement is not threadsafe, so it must run in its own thread.
-    """
-    queue_size = len(PRINT_Q.queue)
-    print(f'{get_timestamp()} _print_queue_consumer is about to start with {queue_size} item(s) already in queue.')
-    while True:
-        msg = PRINT_Q.get()
-        
-        # Exit function when any producer function places 'None' into the queue.
-        if not msg:
-            break
-        else:
-            print(msg)
-    print(f'{get_timestamp()} _print_queue_consumer is ending.')
+    return f'{secs:.3f}s  In {threading.current_thread().name} of {threading.active_count()} with {loop_name}'
 
 
 def main():
@@ -84,14 +111,14 @@ def main():
 
     This runs in the Main Thread
     """
-    PRINT_Q.put(f'{get_timestamp()} main() starting.')
+    _PRINT_Q.put(f'{_timestamp()} main() starting.')
     start()
     
-    PRINT_Q.put(f'{get_timestamp()} Off doing some main programmy stuff.')
+    _PRINT_Q.put(f'{_timestamp()} Off doing some main programmy stuff.')
     time.sleep(0.5)
     
     # Add final messages to the print queue. Join the thread in which it runs.
-    close(f'main() ending.')
+    close()
 
 
 if __name__ == '__main__':
