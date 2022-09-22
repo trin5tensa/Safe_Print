@@ -1,3 +1,7 @@
+
+
+
+
 """intg_test.py
 Created with Python 3.10. Sept 2022
 """
@@ -116,7 +120,7 @@ def tk_main():
     mainframe = ttk.Frame(root, padding="15 15 15 15")
     mainframe.grid(column=0, row=0)
     
-    # Add a close button
+    # Add a _close button
     button = ttk.Button(mainframe, text='Shutdown', command=root.destroy)
     button.grid(column=0, row=next(row_itr), sticky='w')
     
