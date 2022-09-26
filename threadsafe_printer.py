@@ -45,6 +45,8 @@ class SafePrint(AbstractContextManager):
     def _safeprint(self, msg: str, timestamp: bool = True, reset: bool = False):
         """Put a string into the print queue.
         
+        'None' is a special msg. It is not printed but will close the queue and this context manager.
+        
         The exclusive thread and a threadsafe print queue ensure race free printing.
         This is the producer in the print queue's producer/consumer pattern.
         It runs in the same thread as the calling function
@@ -55,7 +57,7 @@ class SafePrint(AbstractContextManager):
             reset: Reset the time to zero (Default = False).
         """
         if reset:
-            _time_0 = time.perf_counter()
+            self._time_0 = time.perf_counter()
         if timestamp:
             self._print_q.put(f'{self._timestamp()} --- {msg}')
         else:
@@ -71,8 +73,8 @@ class SafePrint(AbstractContextManager):
         while True:
             msg = self._print_q.get()
             
-            # Exit function when any producer function places 'None' into the queue.
-            if msg:
+            # Exit function when any producer function places 'None' into the queue otherwise print falsy strings.
+            if msg is not None:
                 print(msg)
             else:
                 break
@@ -92,9 +94,9 @@ class SafePrint(AbstractContextManager):
             asyncio.get_running_loop()
         except RuntimeError as exc:
             if exc.args[0] == 'no running event loop':
-                loop_name = exc.args[0]
+                loop_name = 'no asyncio loop'
             else:
                 raise
         else:
-            loop_name = 'the asyncio loop'
+            loop_name = 'an asyncio loop'
         return f'{secs:.3f}s In {threading.current_thread().name} of {threading.active_count()} with {loop_name}'

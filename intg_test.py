@@ -1,7 +1,3 @@
-
-
-
-
 """intg_test.py
 Created with Python 3.10. Sept 2022
 """
@@ -15,6 +11,8 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from collections.abc import Iterator
 from typing import Optional
+
+from threadsafe_printer import SafePrint
 
 
 TASK_ID_ITR = itertools.count(1)
@@ -30,11 +28,13 @@ def io_blocker(tk_q: queue.Queue, block: float = 0):
     This is a producer for Tkinter's work queue. It will run in a special thread created solely for running this
     function.
     """
+    safeprint(f'io_blocker starting. {block=}s.')
     time.sleep(block)
 
     task_id = next(TASK_ID_ITR)
     work_package = f"Task #{task_id} {block}s: 'Hello Threading World'."
     tk_q.put(work_package)
+    safeprint(f'io_blocker ending. {block=}s.')
 
 
 async def aio_blocker(tk_q: queue.Queue, block: float = 0):
@@ -42,6 +42,7 @@ async def aio_blocker(tk_q: queue.Queue, block: float = 0):
     
     This is a producer for Tkinter's work queue. It will run in the same thread as the asyncio loop.
     """
+    safeprint(f'aio_blocker starting. {block=}s.')
     await asyncio.sleep(block)
     
     task_id = next(TASK_ID_ITR)
@@ -59,6 +60,8 @@ async def aio_blocker(tk_q: queue.Queue, block: float = 0):
         else:
             # The work package has been placed in the queue so we're done.
             break
+
+    safeprint(f'aio_blocker ending. {block=}s.')
 
 
 def tk_callback_consumer(tk_q: queue.Queue, mainframe: ttk.Frame, row_itr: Iterator):
@@ -95,17 +98,22 @@ def tk_callbacks(mainframe: ttk.Frame, row_itr: Iterator):
 
     This runs in the Main Thread.
     """
+    safeprint('tk_callbacks starting')
+    
     # Create the job queue and start its consumer.
     tk_q = queue.Queue()
+    safeprint('tk_callback_consumer starting')
     tk_callback_consumer(tk_q, mainframe, row_itr)
-    
+
     # Schedule the asyncio blocker.
     for block in [1.1, 3.1]:
         asyncio.run_coroutine_threadsafe(aio_blocker(tk_q, block), aio_loop)
     
     # Run the thread blocker.
     for block in [1.2, 3.2]:
-        threading.Thread(target=io_blocker, args=(tk_q, block), name=f'tk_callbacks {block=}s').start()
+        threading.Thread(target=io_blocker, args=(tk_q, block)).start()
+        
+    safeprint('tk_callbacks ending - All blocking callbacks have been scheduled.')
 
 
 def tk_main():
@@ -113,6 +121,7 @@ def tk_main():
 
     This runs in the Main Thread.
     """
+    safeprint('tk_main starting\n')
     row_itr = itertools.count()
     
     # Create the Tk root and mainframe.
@@ -136,6 +145,9 @@ def tk_main():
         time.sleep(0)
     
     root.mainloop()
+    safeprint(' ', timestamp=False)
+    safeprint('tk_callback_consumer ending')
+    safeprint('tk_main ending')
 
 
 async def manage_aio_loop(aio_initiate_shutdown: threading.Event):
@@ -143,6 +155,8 @@ async def manage_aio_loop(aio_initiate_shutdown: threading.Event):
 
     This runs in Asyncio's thread and in asyncio's loop.
     """
+    safeprint('manage_aio_loop starting')
+    
     # Tkinter needs to know about the asyncio loop. A global variable is the easiest way to communicate this.
     global aio_loop
     aio_loop = asyncio.get_running_loop()
@@ -150,6 +164,8 @@ async def manage_aio_loop(aio_initiate_shutdown: threading.Event):
     # The usual wait command — Event.wait() — would block the current thread and the asyncio loop.
     while not aio_initiate_shutdown.is_set():
         await asyncio.sleep(0)
+        
+    safeprint('manage_aio_loop ending')
 
 
 def aio_main(aio_initiate_shutdown: threading.Event):
@@ -157,7 +173,9 @@ def aio_main(aio_initiate_shutdown: threading.Event):
 
     This non-coroutine function runs in Asyncio's thread.
     """
+    safeprint('aio_initiate_shutdown starting')
     asyncio.run(manage_aio_loop(aio_initiate_shutdown))
+    safeprint('aio_initiate_shutdown ending')
 
 
 def main():
@@ -165,6 +183,8 @@ def main():
 
     This runs in the Main Thread.
     """
+    safeprint('main starting')
+
     # Start the asyncio permanent loop in a new thread.
     # aio_shutdown is signalled between threads. `asyncio.Event()` is not threadsafe.
     aio_initiate_shutdown = threading.Event()
@@ -176,8 +196,11 @@ def main():
     # Close the asyncio permanent loop and join the thread in which it runs.
     aio_initiate_shutdown.set()
     aio_thread.join()
+    
+    safeprint('main ending')
 
 
 if __name__ == '__main__':
-    main()
+    with SafePrint() as safeprint:
+        main()
  

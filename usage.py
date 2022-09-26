@@ -10,6 +10,8 @@ def main():
     safeprint('going to sleep')
     time.sleep(0.1)
     safeprint('waking up')
+    safeprint(' ')
+    safeprint(' ', timestamp=False)
     safeprint('resetting the time', reset=True)
     time.sleep(0.05)
     safeprint('main ending')
