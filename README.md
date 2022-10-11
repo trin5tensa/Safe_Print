@@ -48,3 +48,5 @@ no timestamp
 
 Process finished with exit code 0
 ~~~
+
+A more advanced demonstration can be seen in the `tkinter_demo` program.

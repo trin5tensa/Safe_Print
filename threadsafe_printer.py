@@ -1,4 +1,20 @@
-"""threadsafe_printer.py"""
+""" threadsafe_printer.py
+
+Created with Python 3.10
+"""
+#  Copyright (c) 2022-2022. Stephen Rigden.
+#  Last modified 10/8/22, 2:13 PM by stephen.
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import asyncio
 import queue
 import threading
@@ -10,7 +26,7 @@ from typing import Type
 
 
 @dataclass
-class SafePrint(AbstractContextManager):
+class SafePrinter(AbstractContextManager):
     _time_0 = time.perf_counter()
     _print_q = queue.Queue()
     _print_thread: threading.Thread | None = None
@@ -34,15 +50,15 @@ class SafePrint(AbstractContextManager):
             __exc_type:
             __exc_value:
             __traceback:
-
+        
         Returns:
-            False to indicate that any exception raised has not been handled in this method.
+            False to indicate that any exception raised in self._safeprint has not been handled.
         """
         self._print_q.put(None)
         self._print_thread.join()
         return False
     
-    def _safeprint(self, msg: str, timestamp: bool = True, reset: bool = False):
+    def _safeprint(self, msg: str, *, timestamp: bool = True, reset: bool = False):
         """Put a string into the print queue.
         
         'None' is a special msg. It is not printed but will close the queue and this context manager.
@@ -69,22 +85,22 @@ class SafePrint(AbstractContextManager):
         The print statement is not threadsafe, so it must run in its own thread.
         This is the consumer in the print queue's producer/consumer pattern.
         """
-        print(f'{self._timestamp()}: The Safeprinter is open for output.')
+        print(f'{self._timestamp()}: The SafePrinter is open for output.')
         while True:
             msg = self._print_q.get()
             
-            # Exit function when any producer function places 'None' into the queue otherwise print falsy strings.
+            # Exit function when any producer function places 'None'.
             if msg is not None:
                 print(msg)
             else:
                 break
-        print(f'{self._timestamp()}: The Safeprinter has closed.')
+        print(f'{self._timestamp()}: The SafePrinter has closed.')
     
     def _timestamp(self) -> str:
         """Create a timestamp with useful status information.
     
-        This is a support function for the print queue producers. It runs in the same thread as the calling function.
-        Consequently, the returned data does not cross between threads.
+        This is a support function for the print queue producers. It runs in the same thread as the calling function
+        so the returned data does not cross between threads.
     
         Returns:
             timestamp
@@ -94,9 +110,9 @@ class SafePrint(AbstractContextManager):
             asyncio.get_running_loop()
         except RuntimeError as exc:
             if exc.args[0] == 'no running event loop':
-                loop_name = 'no asyncio loop'
+                loop_text = 'without a loop'
             else:
                 raise
         else:
-            loop_name = 'an asyncio loop'
-        return f'{secs:.3f}s In {threading.current_thread().name} of {threading.active_count()} with {loop_name}'
+            loop_text = 'with a loop'
+        return f'{secs:.3f}s In {threading.current_thread().name} of {threading.active_count()} {loop_text}'
