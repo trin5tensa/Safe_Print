@@ -3,7 +3,7 @@
 Created with Python 3.10
 """
 #  Copyright (c) 2022-2022. Stephen Rigden.
-#  Last modified 10/11/22, 8:44 AM by stephen.
+#  Last modified 10/12/22, 7:48 AM by stephen.
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -31,13 +31,13 @@ from typing import Optional
 from threadsafe_printer import SafePrinter
 
 
-TASK_ID_ITR = itertools.count(1)
+# TASK_ID_ITR = itertools.count(1)
 
 # Global reference to loop allows access from different environments.
 aio_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
-def io_blocker(tk_q: queue.Queue, block: float = 0) -> None:
+def io_blocker(task_id: int, tk_q: queue.Queue, block: float = 0) -> None:
     """ Block the thread and put a 'Hello World' work package into Tkinter's work queue.
     
     This is a producer for Tkinter's work queue. It will run in a special thread created solely for running this
@@ -45,6 +45,7 @@ def io_blocker(tk_q: queue.Queue, block: float = 0) -> None:
     
     
     Args:
+        task_id: Sequentially issued tkinter task number.
         tk_q: tkinter's work queue.
         block: block time
         
@@ -58,37 +59,38 @@ def io_blocker(tk_q: queue.Queue, block: float = 0) -> None:
     # raise IOError('Just testing an expected error.')
     # raise ValueError('Just testing an unexpected error.')
 
-    task_id = next(TASK_ID_ITR)
     work_package = f"Task #{task_id} {block}s: 'Hello Threading World'."
     tk_q.put(work_package)
     safeprint(f'io_blocker ending. {block=}s.')
     
     
-def io_exception_handler(tk_q: queue.Queue, block: float = 0) -> None:
+def io_exception_handler(task_id: int, tk_q: queue.Queue, block: float = 0) -> None:
     """ Exception handler for non-awaitable blocking callback.
     
     It will run in a special thread created solely for running io_blocker.
     
     Args:
+        task_id: Sequentially issued tkinter task number.
         tk_q: tkinter's work queue.
         block: block time
     """
     safeprint(f'io_exception_handler starting. {block=}s.')
     try:
-        io_blocker(tk_q, block)
+        io_blocker(task_id, tk_q, block)
     except IOError as exc:
         safeprint(f'io_exception_handler: {exc!r} was handled correctly. ')
     finally:
         safeprint(f'io_exception_handler ending. {block=}s.')
 
 
-async def aio_blocker(tk_q: queue.Queue, block: float = 0) -> None:
+async def aio_blocker(task_id: int, tk_q: queue.Queue, block: float = 0) -> None:
     """ Asynchronously block the thread and put a 'Hello World' work package into Tkinter's work queue.
     
     This is a producer for Tkinter's work queue. It will run in the same thread as the asyncio loop. The statement
     `await asyncio.sleep(block)` can be replaced with any awaitable blocking code.
     
     Args:
+        task_id: Sequentially issued tkinter task number.
         tk_q: tkinter's work queue.
         block: block time
 
@@ -102,7 +104,6 @@ async def aio_blocker(tk_q: queue.Queue, block: float = 0) -> None:
     # raise IOError('Just testing an expected error.')
     # raise ValueError('Just testing an unexpected error.')
     
-    task_id = next(TASK_ID_ITR)
     work_package = f"Task #{task_id} {block}s: 'Hello Asynchronous World'."
     
     # Put the work package into the tkinter's work queue.
@@ -194,6 +195,7 @@ def tk_callbacks(mainframe: ttk.Frame, row_itr: Iterator):
         row_itr: A generator of line numbers for displaying items from the work queue.
     """
     safeprint('tk_callbacks starting')
+    task_id_itr = itertools.count(1)
     
     # Create the job queue and start its consumer.
     tk_q = queue.Queue()
@@ -201,18 +203,21 @@ def tk_callbacks(mainframe: ttk.Frame, row_itr: Iterator):
     tk_callback_consumer(tk_q, mainframe, row_itr)
 
     # Schedule the asyncio blocker.
-    for block in [1.1, 3.1]:
-        # This is not an asyncio.Future because they are not threadsafe. Also, they do not have a wait with timeout
-        # which we shall need.
-        future: concurrent.futures.Future = asyncio.run_coroutine_threadsafe(aio_blocker(tk_q, block), aio_loop)
+    for block in [3.1, 1.1]:
+        # This is a concurrent.futures.Future not an asyncio.Future because it isn't threadsafe. Also,
+        # it doesn't have a wait with timeout which we shall need.
+        task_id = next(task_id_itr)
+        future = asyncio.run_coroutine_threadsafe(aio_blocker(task_id, tk_q, block), aio_loop)
 
         # Can't use Future.add_done_callback here. It doesn't return until the future is done and that would block
         # tkinter's event loop.
         aio_exception_handler(mainframe, future, block)
         
     # Run the thread blocker.
-    for block in [1.2, 3.2]:
-        threading.Thread(target=io_exception_handler, args=(tk_q, block), name=f'IO Block Thread ({block}s)').start()
+    for block in [3.2, 1.2]:
+        task_id = next(task_id_itr)
+        threading.Thread(target=io_exception_handler, args=(task_id, tk_q, block),
+                         name=f'IO Block Thread ({block}s)').start()
 
     safeprint('tk_callbacks ending - All blocking callbacks have been scheduled.\n')
 
