@@ -3,7 +3,7 @@
 Created with Python 3.10
 """
 #  Copyright (c) 2022-2022. Stephen Rigden.
-#  Last modified 10/12/22, 7:48 AM by stephen.
+#  Last modified 10/13/22, 7:06 AM by stephen.
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -30,8 +30,6 @@ from typing import Optional
 
 from threadsafe_printer import SafePrinter
 
-
-# TASK_ID_ITR = itertools.count(1)
 
 # Global reference to loop allows access from different environments.
 aio_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -305,7 +303,7 @@ def main():
     
     # Close the asyncio permanent loop and join the thread in which it runs.
     aio_initiate_shutdown.set()
-    # aio_thread.join()
+    aio_thread.join()
     
     safeprint('main ending')
 
