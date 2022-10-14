@@ -3,7 +3,7 @@
 Created with Python 3.10
 """
 #  Copyright (c) 2022-2022. Stephen Rigden.
-#  Last modified 10/13/22, 7:06 AM by stephen.
+#  Last modified 10/14/22, 8:44 AM by stephen.
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation, either version 3 of the License, or
@@ -13,7 +13,7 @@ Created with Python 3.10
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
 #  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
 import concurrent.futures
